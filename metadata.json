@@ -1,0 +1,8 @@
+{
+  "uuid": "idlescape@goku.github.com",
+  "name": "Idlescape",
+  "description": "A Wayland-compatible video screensaver powered by mpv.",
+  "shell-version": ["45", "46", "47"],
+  "url": "https://github.com/goku",
+  "settings-schema": "org.gnome.shell.extensions.idlescape"
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.idlescape" path="/org/gnome/shell/extensions/idlescape/">
+    <key name="idle-timeout" type="i">
+      <default>300</default>
+      <summary>Idle Timeout</summary>
+      <description>Seconds of inactivity before screensaver triggers.</description>
+    </key>
+    <key name="video-path" type="s">
+      <default>""</default>
+      <summary>Video Path</summary>
+      <description>Absolute path to the video file.</description>
+    </key>
+    <key name="enabled" type="b">
+      <default>true</default>
+      <summary>Enabled</summary>
+      <description>Whether the screensaver is active.</description>
+    </key>
+    <key name="backend-mode" type="s">
+      <default>"bash"</default>
+      <summary>Backend Mode</summary>
+      <description>Select the backend: 'bash' or 'native'.</description>
+    </key>
+  </schema>
+</schemalist>
