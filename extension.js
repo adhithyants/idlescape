@@ -184,8 +184,14 @@ export default class IdlescapeExtension extends Extension {
                return; 
             }
 
+            // Path check
+            if (!this._videoPath || !GLib.file_test(this._videoPath, GLib.FileTest.EXISTS)) {
+                console.error(`[Idlescape] Video file not found or empty: ${this._videoPath}`);
+                return;
+            }
+
             this._bashProc = new Gio.Subprocess({
-                argv: [scriptPath],
+                argv: [scriptPath, this._videoPath],
                 flags: Gio.SubprocessFlags.NONE
             });
             this._bashProc.init(null);

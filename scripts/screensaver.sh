@@ -1,0 +1,25 @@
+#!/bin/bash
+
+VIDEO="${1:-/home/goku/Videos/screensaver/girl-behind-curtains-3.3840x2160.mp4}"
+
+# Prevent duplicate playback
+pgrep -x "mpv" >/dev/null && exit 0
+
+# Launch optimized mpv screensaver
+# Using dmabuf-wayland for direct, glitch-free rendering on Wayland
+# Disabling dithering and hardware decoding to bypass driver/scaling issues
+mpv \
+  --fs \
+  --loop=inf \
+  --no-audio \
+  --really-quiet \
+  --stop-screensaver=no \
+  --hwdec=no \
+  --vo=dmabuf-wayland,wayland,gpu \
+  --dither=no \
+  --profile=fast \
+  --no-osc \
+  --no-osd-bar \
+  --no-input-default-bindings \
+  --no-config \
+  "$VIDEO"

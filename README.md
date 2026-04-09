@@ -63,7 +63,12 @@ To test and run Idlescape manually from source:
 ## 📖 Backend Modes
 Idlescape ships with two modes controllable via the Settings GUI:
 * **Native (Recommended):** Spawns `mpv` natively via `Gio.Subprocess`, leveraging strict Wayland routines (`--vo=dmabuf-wayland`, `--fs-screen=0`) with auto-fallback to `gpu-next`.
-* **Bash (Stable Fallback):** Legacy mode that runs `~/.local/bin/screensaver.sh` if you prefer to manage the environment and `mpv` execution manually.
+* **Bash (Stable Fallback):** Legacy mode that runs `~/.local/bin/screensaver.sh` if you prefer to manage the environment and `mpv` execution manually. **To use this mode, you must install the script from the source folder:**
+  ```bash
+  mkdir -p ~/.local/bin
+  cp scripts/screensaver.sh ~/.local/bin/
+  chmod +x ~/.local/bin/screensaver.sh
+  ```
 
 ---
 *Built to just work—so your system can relax.*
