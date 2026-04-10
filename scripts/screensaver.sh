@@ -6,16 +6,15 @@ VIDEO="${1:-/home/goku/Videos/screensaver/girl-behind-curtains-3.3840x2160.mp4}"
 pgrep -x "mpv" >/dev/null && exit 0
 
 # Launch optimized mpv screensaver
-# Using dmabuf-wayland for direct, glitch-free rendering on Wayland
-# Disabling dithering and hardware decoding to bypass driver/scaling issues
-mpv \
+# Prefer gpu-next since it has been more reliable across the sample videos.
+exec mpv \
   --fs \
   --loop=inf \
   --no-audio \
   --really-quiet \
   --stop-screensaver=no \
   --hwdec=no \
-  --vo=dmabuf-wayland,wayland,gpu \
+  --vo=gpu-next \
   --dither=no \
   --profile=fast \
   --no-osc \

@@ -10,6 +10,9 @@ const State = {
     PLAYING: 2
 };
 
+const SIGTERM = 15;
+const MPV_LOG_FILE = '/tmp/idlescape-mpv.log';
+
 export default class IdlescapeExtension extends Extension {
     enable() {
         console.log(`[Idlescape] Extension enabled`);
@@ -86,7 +89,6 @@ export default class IdlescapeExtension extends Extension {
             const timeoutMs = this._idleTimeout * 1000;
             
             this._idleWatchId = this._idleMonitor.add_idle_watch(timeoutMs, () => this._onSystemIdle());
-            this._activeWatchId = this._idleMonitor.add_user_active_watch(() => this._onSystemActive());
             
             console.log(`[Idlescape] Primary Idle Monitor engaged (${this._idleTimeout}s). No polling loops used.`);
         } catch (e) {
@@ -94,6 +96,16 @@ export default class IdlescapeExtension extends Extension {
             console.warn(`[Idlescape] Primary monitor failed, reverting to DBus fallback: ${e}`);
             this._setupDBusFallback();
         }
+    }
+
+    _armActiveWatch() {
+        if (!this._idleMonitor || this._activeWatchId)
+            return;
+
+        this._activeWatchId = this._idleMonitor.add_user_active_watch(() => {
+            this._activeWatchId = null;
+            this._onSystemActive();
+        });
     }
 
     _setupDBusFallback() {
@@ -132,8 +144,9 @@ export default class IdlescapeExtension extends Extension {
     }
 
     _onSystemIdle() {
-        if (this._state === State.PLAYING || !this._enabled) return;
+        if (this._state === State.PLAYING || !this._enabled || Main.screenShield.locked) return;
         this._state = State.IDLE;
+        this._armActiveWatch();
         
         console.log(`[Idlescape] User idle detected. Waiting 1.5s grace period to completely avoid micro-flickering.`);
         
@@ -143,7 +156,7 @@ export default class IdlescapeExtension extends Extension {
 
         this._graceTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
             this._graceTimeoutId = null;
-            if (this._state === State.IDLE) {
+            if (this._state === State.IDLE && !Main.screenShield.locked) {
                 this._startPlayback();
             }
             return GLib.SOURCE_REMOVE;
@@ -178,7 +191,7 @@ export default class IdlescapeExtension extends Extension {
     
     _startBashBackend() {
         try {
-            let scriptPath = GLib.build_filenamev([GLib.get_home_dir(), '.local', 'bin', 'screensaver.sh']);
+            let scriptPath = GLib.build_filenamev([this.path, 'scripts', 'screensaver.sh']);
             if (!GLib.file_test(scriptPath, GLib.FileTest.EXISTS)) {
                console.error(`[Idlescape] Bash script missing: ${scriptPath}`);
                return; 
@@ -195,6 +208,21 @@ export default class IdlescapeExtension extends Extension {
                 flags: Gio.SubprocessFlags.NONE
             });
             this._bashProc.init(null);
+            this._bashProc.wait_async(null, (proc, res) => {
+                try {
+                    proc.wait_finish(res);
+                } catch (e) {
+                    console.error(`[Idlescape] Bash backend wait failed: ${e}`);
+                } finally {
+                    if (this._bashProc === proc)
+                        this._bashProc = null;
+
+                    if (this._state === State.PLAYING) {
+                        console.log(`[Idlescape] Bash backend exited while screensaver was active. Resetting state.`);
+                        this._state = State.ACTIVE;
+                    }
+                }
+            });
             
             console.log(`[Idlescape] Bash Script spawned with PID: ${this._bashProc.get_identifier()}`);
         } catch(e) {
@@ -226,15 +254,21 @@ export default class IdlescapeExtension extends Extension {
                 '--fs-screen=0', 
                 '--hwdec=no',
                 '--dither=no',
-                '--profile=fast'
+                '--profile=fast',
+                '--stop-screensaver=no',
+                '--no-input-default-bindings',
+                '--really-quiet',
+                '--no-osc',
+                '--no-osd-bar',
+                `--log-file=${MPV_LOG_FILE}`
             ];
 
             if (!useFallback) {
-                flags.push('--vo=dmabuf-wayland');
-                console.log(`[Idlescape] Native Mode: Using primary dmabuf-wayland flags`);
-            } else {
                 flags.push('--vo=gpu-next');
-                console.warn(`[Idlescape] Native Mode: Using fallback gpu-next flags`);
+                console.log(`[Idlescape] Native Mode: Using primary gpu-next flags`);
+            } else {
+                flags.push('--vo=dmabuf-wayland');
+                console.warn(`[Idlescape] Native Mode: Using fallback dmabuf-wayland flags`);
             }
 
             flags.push(this._videoPath);
@@ -254,10 +288,23 @@ export default class IdlescapeExtension extends Extension {
                     if (!proc.get_successful() && !useFallback) {
                         if (this._state === State.PLAYING) {
                             console.error(`[Idlescape] Primary Native spawn crashed. Triggering gpu-next Fallback!`);
+                            if (this._nativeProc === proc)
+                                this._nativeProc = null;
                             this._startNativeBackend(true);
+                            return;
                         }
                     }
-                } catch(e) {}
+                } catch(e) {
+                    console.error(`[Idlescape] Native backend wait failed: ${e}`);
+                }
+
+                if (this._nativeProc === proc)
+                    this._nativeProc = null;
+
+                if (this._state === State.PLAYING) {
+                    console.log(`[Idlescape] Native backend exited while screensaver was active. Resetting state.`);
+                    this._state = State.ACTIVE;
+                }
             });
         } catch(e) {
             console.error(`[Idlescape] Failed to launch Native backend: ${e}`);
@@ -265,19 +312,28 @@ export default class IdlescapeExtension extends Extension {
     }
 
     _stopPlayback() {
-        console.log(`[Idlescape] Terminating video subprocesses...`);
-        
-        if (this._bashProc) {
-            console.log(`[Idlescape] Terminating Bash Process [PID: ${this._bashProc.get_identifier()}]`);
-            this._bashProc.force_exit();
-            this._bashProc = null;
-        }
+        console.log(`[Idlescape] User activity detected! Closing video window...`);
 
-        if (this._nativeProc) {
-            console.log(`[Idlescape] Terminating Native MPV [PID: ${this._nativeProc.get_identifier()}]`);
-            this._nativeProc.force_exit();
-            this._nativeProc = null;
-        }
+        this._stopProcess('_bashProc', 'bash backend');
+        this._stopProcess('_nativeProc', 'native mpv');
+    }
+
+    _stopProcess(procKey, label) {
+        const proc = this[procKey];
+        if (!proc)
+            return;
+
+        console.log(`[Idlescape] Requesting graceful shutdown for ${label}...`);
+        proc.send_signal(SIGTERM);
+
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
+            if (this[procKey] === proc && proc.get_identifier() !== null) {
+                console.warn(`[Idlescape] ${label} did not exit after SIGTERM. Forcing exit.`);
+                proc.force_exit();
+            }
+
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     disable() {
