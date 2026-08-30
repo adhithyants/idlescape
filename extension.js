@@ -182,61 +182,7 @@ export default class IdlescapeExtension extends Extension {
     // --- PHASE 7 & 8: Process Orchestration ---
     _startPlayback() {
         this._state = State.PLAYING;
-
-        
-        if (this._backendMode === 'bash') {
-            this._startBashBackend();
-        } else {
-            this._startNativeBackend();
-        }
-    }
-    
-    _startBashBackend() {
-        try {
-            // Pre-flight program check
-            let mpvPath = GLib.find_program_in_path('mpv');
-            if (!mpvPath) {
-                logError(new Error(`[Idlescape] mpv not found in PATH! (Bash backend)`));
-                return;
-            }
-
-            let scriptPath = GLib.build_filenamev([this.path, 'scripts', 'screensaver.sh']);
-            if (!GLib.file_test(scriptPath, GLib.FileTest.EXISTS)) {
-               logError(new Error(`[Idlescape] Bash script missing: ${scriptPath}`));
-               return; 
-            }
-
-            // Path check
-            if (!this._videoPath || !GLib.file_test(this._videoPath, GLib.FileTest.EXISTS)) {
-                logError(new Error(`[Idlescape] Video file not found or empty: ${this._videoPath}`));
-                return;
-            }
-
-            this._bashProc = new Gio.Subprocess({
-                argv: [scriptPath, this._videoPath],
-                flags: Gio.SubprocessFlags.NONE
-            });
-            this._bashProc.init(null);
-            this._bashProc.wait_async(null, (proc, res) => {
-                try {
-                    proc.wait_finish(res);
-                } catch (e) {
-                    logError(e, `[Idlescape] Bash backend wait failed`);
-                } finally {
-                    if (this._bashProc === proc)
-                        this._bashProc = null;
-
-                    if (this._state === State.PLAYING) {
-
-                        this._state = State.ACTIVE;
-                    }
-                }
-            });
-            
-
-        } catch(e) {
-            logError(e, `[Idlescape] Failed to launch Bash backend`);
-        }
+        this._startNativeBackend();
     }
 
     _startNativeBackend(useFallback = false) {
@@ -321,9 +267,6 @@ export default class IdlescapeExtension extends Extension {
     }
 
     _stopPlayback() {
-
-
-        this._stopProcess('_bashProc', 'bash backend');
         this._stopProcess('_nativeProc', 'native mpv');
     }
 

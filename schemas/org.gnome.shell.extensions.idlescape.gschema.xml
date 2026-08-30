@@ -17,9 +17,9 @@
       <description>Whether the video screensaver is active.</description>
     </key>
     <key name="backend-mode" type="s">
-      <default>"bash"</default>
+      <default>"native"</default>
       <summary>Backend Mode</summary>
-      <description>Select the backend: 'bash' or 'native'.</description>
+      <description>Select the backend: 'native'.</description>
     </key>
   </schema>
 </schemalist>

@@ -100,33 +100,6 @@ export default class IdlescapePreferences extends ExtensionPreferences {
         videoRow.add_suffix(selectButton);
         videoRow.activatable_widget = selectButton;
         group.add(videoRow);
-
-        // 4. Backend Settings (Legacy support)
-        const backendGroup = new Adw.PreferencesGroup({
-            title: 'Advanced Settings'
-        });
-        page.add(backendGroup);
-
-        const backendRow = new Adw.ComboRow({
-            title: 'Backend Mode',
-            subtitle: 'Choose between the stable Bash script or experimental Native GJS logic.',
-            model: new Gtk.StringList({
-                strings: ['Bash (Stable)', 'Native GJS (Experimental)']
-            })
-        });
-
-        // Sync logic for ComboRow
-        const syncBackend = () => {
-            backendRow.selected = (settings.get_string('backend-mode') === 'native') ? 1 : 0;
-        };
-        syncBackend();
-        
-        backendRow.connect('notify::selected', () => {
-            const mode = backendRow.selected === 1 ? 'native' : 'bash';
-            settings.set_string('backend-mode', mode);
-        });
-        settings.connect('changed::backend-mode', syncBackend);
-
-        backendGroup.add(backendRow);
     }
 }
+
