@@ -3,5 +3,6 @@
   "name": "Idlescape",
   "description": "Wayland-compatible video screensaver",
   "shell-version": ["45", "46", "47", "48", "49"],
-  "settings-schema": "org.gnome.shell.extensions.idlescape"
+  "settings-schema": "org.gnome.shell.extensions.idlescape",
+  "version": 2
 }
