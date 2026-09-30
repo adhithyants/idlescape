@@ -16,6 +16,11 @@
       <summary>Enable screensaver</summary>
       <description>Whether the video screensaver is active.</description>
     </key>
+    <key name="multi-monitor" type="b">
+      <default>false</default>
+      <summary>Multi-monitor playback</summary>
+      <description>Whether the video screensaver plays on every connected monitor.</description>
+    </key>
     <key name="backend-mode" type="s">
       <default>"native"</default>
       <summary>Backend Mode</summary>
