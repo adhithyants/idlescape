@@ -10,6 +10,7 @@ Optimized for **Wayland**, Idlescape boasts flawless lock-screen integration, ze
 ## 🌟 Features
 * **Zero Polling Loops:** Uses GNOME's native `core_idle_monitor` to safely detect inactivity without eating CPU cycles. 
 * **Optional Multi-Monitor Playback:** Plays the same video on every connected monitor when enabled in the preferences. This option is off by default.
+* **Aspect-Ratio-Safe Screen Fill:** Optionally fills each active monitor by cropping the image as needed, without stretching it. This option is off by default.
 * **Crash-Proof Process Guards:** Tracks `mpv` PIDs aggressively to guarantee absolutely zero runaway ghost-processes during extension reloads or system lock events.
 * **Native Preferences GUI:** Beautiful Libadwaita settings window right inside your GNOME Extensions App. 
 * **Micro-Stutter Protection:** Enforces a 1.5-second grace period buffer to prevent flickering from accidental mouse twitches.
@@ -60,10 +61,11 @@ To test and run Idlescape manually from source:
    - **Video Path:** Point this to the absolute path of your desired screensaver video (e.g., `/home/user/Videos/relax.mp4`).
    - **Idle Timeout:** Time in seconds before the video triggers.
    - **Multi-monitor playback:** Enable playback on every connected monitor. Disabled by default.
+   - **Fullscreen playback:** Fill the active monitor or monitors without stretching; the image may be cropped. Disabled by default.
 
 ## 📖 Backend Modes
 Idlescape ships with two modes controllable via the Settings GUI:
-* **Native (Recommended):** Spawns `mpv` natively via `Gio.Subprocess`. Multi-monitor playback is optional and disabled by default; when enabled, it starts one player per connected monitor.
+* **Native (Recommended):** Spawns `mpv` natively via `Gio.Subprocess`. Multi-monitor playback is optional and disabled by default; when enabled, it starts one player per connected monitor. Fullscreen screen fill is also optional and preserves aspect ratio by cropping when necessary.
 * **Bash (Stable Fallback):** Legacy mode that runs `~/.local/bin/screensaver.sh` if you prefer to manage the environment and `mpv` execution manually. **To use this mode, you must install the script from the source folder:**
   ```bash
   mkdir -p ~/.local/bin

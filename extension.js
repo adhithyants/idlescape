@@ -33,7 +33,8 @@ export default class IdlescapeExtension extends Extension {
             this._settings.connect('changed::video-path', () => this._syncSettings()),
             this._settings.connect('changed::enabled', () => this._onEnabledChanged()),
             this._settings.connect('changed::backend-mode', () => this._syncSettings()),
-            this._settings.connect('changed::multi-monitor', () => this._syncSettings())
+            this._settings.connect('changed::multi-monitor', () => this._syncSettings()),
+            this._settings.connect('changed::fullscreen', () => this._syncSettings())
         ];
 
         // --- PHASE 10: Lock Screen Protection ---
@@ -65,6 +66,7 @@ export default class IdlescapeExtension extends Extension {
         this._enabled = this._settings.get_boolean('enabled');
         this._backendMode = this._settings.get_string('backend-mode');
         this._multiMonitor = this._settings.get_boolean('multi-monitor');
+        this._fullscreen = this._settings.get_boolean('fullscreen');
 
     }
 
@@ -243,6 +245,9 @@ export default class IdlescapeExtension extends Extension {
                 '--no-osd-bar',
                 `--log-file=${logFile}`
             ];
+
+            if (this._fullscreen)
+                flags.push('--panscan=1');
 
             if (!useFallback) {
                 flags.push('--vo=gpu-next');

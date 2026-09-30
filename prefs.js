@@ -36,7 +36,7 @@ export default class IdlescapePreferences extends ExtensionPreferences {
         // 3. Fullscreen playback
         const fullscreenRow = new Adw.SwitchRow({
             title: 'Fullscreen playback',
-            subtitle: 'Play the screensaver video in fullscreen mode.'
+            subtitle: 'Fill each active monitor without stretching; the image may be cropped.'
         });
         settings.bind('fullscreen', fullscreenRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         group.add(fullscreenRow);
