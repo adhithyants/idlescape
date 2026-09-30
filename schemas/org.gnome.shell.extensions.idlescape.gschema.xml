@@ -21,6 +21,11 @@
       <summary>Multi-monitor playback</summary>
       <description>Whether the video screensaver plays on every connected monitor.</description>
     </key>
+    <key name="fullscreen" type="b">
+      <default>false</default>
+      <summary>Fullscreen playback</summary>
+      <description>Whether the video screensaver plays in fullscreen mode.</description>
+    </key>
     <key name="backend-mode" type="s">
       <default>"native"</default>
       <summary>Backend Mode</summary>

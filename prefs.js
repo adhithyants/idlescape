@@ -33,7 +33,15 @@ export default class IdlescapePreferences extends ExtensionPreferences {
         settings.bind('multi-monitor', multiMonitorRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         group.add(multiMonitorRow);
 
-        // 3. Idle Timeout
+        // 3. Fullscreen playback
+        const fullscreenRow = new Adw.SwitchRow({
+            title: 'Fullscreen playback',
+            subtitle: 'Play the screensaver video in fullscreen mode.'
+        });
+        settings.bind('fullscreen', fullscreenRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        group.add(fullscreenRow);
+
+        // 4. Idle Timeout
         const timeoutRow = new Adw.SpinRow({
             title: 'Idle Timeout (seconds)',
             subtitle: 'Duration of inactivity before the video starts.',
@@ -47,7 +55,7 @@ export default class IdlescapePreferences extends ExtensionPreferences {
         settings.bind('idle-timeout', timeoutRow, 'value', Gio.SettingsBindFlags.DEFAULT);
         group.add(timeoutRow);
 
-        // 4. Video File Selection (ActionRow + FileDialog)
+        // 5. Video File Selection (ActionRow + FileDialog)
         const videoRow = new Adw.ActionRow({
             title: 'Screensaver Video',
             subtitle: settings.get_string('video-path') || 'No video selected',
