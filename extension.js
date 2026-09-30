@@ -21,6 +21,8 @@ export default class IdlescapeExtension extends Extension {
         this._state = State.ACTIVE;
         this._graceTimeoutId = null;
         this._idleMonitor = null;
+        this._nativeProcs = new Map();
+        this._stopTimeoutIds = [];
         
         // --- PHASE 3: Settings Binding ---
         this._settings = this.getSettings();
@@ -30,7 +32,8 @@ export default class IdlescapeExtension extends Extension {
             this._settings.connect('changed::idle-timeout', () => this._onTimeoutChanged()),
             this._settings.connect('changed::video-path', () => this._syncSettings()),
             this._settings.connect('changed::enabled', () => this._onEnabledChanged()),
-            this._settings.connect('changed::backend-mode', () => this._syncSettings())
+            this._settings.connect('changed::backend-mode', () => this._syncSettings()),
+            this._settings.connect('changed::multi-monitor', () => this._syncSettings())
         ];
 
         // --- PHASE 10: Lock Screen Protection ---
@@ -61,6 +64,7 @@ export default class IdlescapeExtension extends Extension {
         this._videoPath = this._settings.get_string('video-path');
         this._enabled = this._settings.get_boolean('enabled');
         this._backendMode = this._settings.get_string('backend-mode');
+        this._multiMonitor = this._settings.get_boolean('multi-monitor');
 
     }
 
@@ -191,22 +195,44 @@ export default class IdlescapeExtension extends Extension {
             let mpvPath = GLib.find_program_in_path('mpv');
             if (!mpvPath) {
                 logError(new Error(`[Idlescape] mpv not found in PATH!`));
+                this._state = State.ACTIVE;
                 return;
             }
 
             // Path check
             if (!this._videoPath || !GLib.file_test(this._videoPath, GLib.FileTest.EXISTS)) {
                 logError(new Error(`[Idlescape] Video file not found or empty: ${this._videoPath}`));
+                this._state = State.ACTIVE;
                 return;
             }
 
-            // Multi-monitor: target primary via --fs-screen=0
+            const monitorCount = this._multiMonitor
+                ? Math.max(1, Main.layoutManager.monitors.length)
+                : 1;
+
+            for (let monitorIndex = 0; monitorIndex < monitorCount; monitorIndex++)
+                this._startNativeProcess(mpvPath, monitorIndex, monitorCount, useFallback);
+        } catch(e) {
+            logError(e, `[Idlescape] Failed to launch Native backend`);
+            if (this._state === State.PLAYING)
+                this._state = State.ACTIVE;
+        }
+    }
+
+    _startNativeProcess(mpvPath, monitorIndex, monitorCount, useFallback) {
+        if (this._state !== State.PLAYING)
+            return;
+
+        try {
+            const logFile = monitorCount > 1
+                ? `${MPV_LOG_FILE}.${monitorIndex}`
+                : MPV_LOG_FILE;
             let flags = [
                 mpvPath,
                 '--fullscreen',
                 '--loop',
                 '--no-audio',
-                '--fs-screen=0', 
+                `--fs-screen=${monitorIndex}`,
                 '--hwdec=no',
                 '--dither=no',
                 '--profile=fast',
@@ -215,7 +241,7 @@ export default class IdlescapeExtension extends Extension {
                 '--really-quiet',
                 '--no-osc',
                 '--no-osd-bar',
-                `--log-file=${MPV_LOG_FILE}`
+                `--log-file=${logFile}`
             ];
 
             if (!useFallback) {
@@ -228,65 +254,58 @@ export default class IdlescapeExtension extends Extension {
 
             flags.push(this._videoPath);
 
-            this._nativeProc = new Gio.Subprocess({
+            const proc = new Gio.Subprocess({
                 argv: flags,
                 flags: Gio.SubprocessFlags.NONE
             });
-            
-            this._nativeProc.init(null);
+            proc.init(null);
+            this._nativeProcs.set(monitorIndex, proc);
 
-
-            // Detect launch crash to trigger fallback
-            this._nativeProc.wait_async(null, (proc, res) => {
+            proc.wait_async(null, (finishedProc, res) => {
+                let successful = false;
                 try {
-                    proc.wait_finish(res);
-                    if (!proc.get_successful() && !useFallback) {
-                        if (this._state === State.PLAYING) {
-                            logError(new Error(`[Idlescape] Primary Native spawn crashed. Triggering gpu-next Fallback!`));
-                            if (this._nativeProc === proc)
-                                this._nativeProc = null;
-                            this._startNativeBackend(true);
-                            return;
-                        }
-                    }
-                } catch(e) {
-                    logError(e, `[Idlescape] Native backend wait failed`);
+                    finishedProc.wait_finish(res);
+                    successful = finishedProc.get_successful();
+                } catch (e) {
+                    logError(e, `[Idlescape] Native backend wait failed on monitor ${monitorIndex}`);
                 }
 
-                if (this._nativeProc === proc)
-                    this._nativeProc = null;
+                if (this._nativeProcs.get(monitorIndex) === finishedProc)
+                    this._nativeProcs.delete(monitorIndex);
+                if (this._state !== State.PLAYING)
+                    return;
 
-                if (this._state === State.PLAYING) {
-
-                    this._state = State.ACTIVE;
+                if (!successful && !useFallback) {
+                    logError(new Error(`[Idlescape] mpv failed on monitor ${monitorIndex}; retrying with the fallback video output.`));
+                    this._startNativeProcess(mpvPath, monitorIndex, monitorCount, true);
+                    return;
                 }
+
+                logError(new Error(`[Idlescape] mpv stopped unexpectedly on monitor ${monitorIndex}.`));
+                this._state = State.ACTIVE;
+                this._stopPlayback();
             });
-        } catch(e) {
-            logError(e, `[Idlescape] Failed to launch Native backend`);
+        } catch (e) {
+            logError(e, `[Idlescape] Failed to launch mpv on monitor ${monitorIndex}`);
+            if (this._state === State.PLAYING) {
+                this._state = State.ACTIVE;
+                this._stopPlayback();
+            }
         }
     }
 
     _stopPlayback() {
-        this._stopProcess('_nativeProc', 'native mpv');
-    }
+        for (const [monitorIndex, proc] of this._nativeProcs) {
+            proc.send_signal(SIGTERM);
+            const timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
+                if (this._nativeProcs.get(monitorIndex) === proc && proc.get_identifier() !== null)
+                    proc.force_exit();
 
-    _stopProcess(procKey, label) {
-        const proc = this[procKey];
-        if (!proc)
-            return;
-
-
-        proc.send_signal(SIGTERM);
-
-        this._stopTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
-            if (this[procKey] === proc && proc.get_identifier() !== null) {
-
-                proc.force_exit();
-            }
-
-            this._stopTimeoutId = null;
-            return GLib.SOURCE_REMOVE;
-        });
+                this._stopTimeoutIds = this._stopTimeoutIds.filter(id => id !== timeoutId);
+                return GLib.SOURCE_REMOVE;
+            });
+            this._stopTimeoutIds.push(timeoutId);
+        }
     }
 
     disable() {
@@ -294,10 +313,8 @@ export default class IdlescapeExtension extends Extension {
         
         // --- PHASE 11: Cleanup & Reload Zombie Safety ---
         try {
-            if (this._stopTimeoutId) {
-                GLib.source_remove(this._stopTimeoutId);
-                this._stopTimeoutId = null;
-            }
+            this._stopTimeoutIds.forEach(id => GLib.source_remove(id));
+            this._stopTimeoutIds = [];
 
             if (this._graceTimeoutId) {
                 GLib.source_remove(this._graceTimeoutId);
