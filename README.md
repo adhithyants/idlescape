@@ -9,7 +9,7 @@ Optimized for **Wayland**, Idlescape boasts flawless lock-screen integration, ze
 
 ## 🌟 Features
 * **Zero Polling Loops:** Uses GNOME's native `core_idle_monitor` to safely detect inactivity without eating CPU cycles. 
-* **Wayland & Multi-Monitor Safe:** Forces `dmabuf-wayland` playback directly on your primary monitor via mpv.
+* **Optional Multi-Monitor Playback:** Plays the same video on every connected monitor when enabled in the preferences. This option is off by default.
 * **Crash-Proof Process Guards:** Tracks `mpv` PIDs aggressively to guarantee absolutely zero runaway ghost-processes during extension reloads or system lock events.
 * **Native Preferences GUI:** Beautiful Libadwaita settings window right inside your GNOME Extensions App. 
 * **Micro-Stutter Protection:** Enforces a 1.5-second grace period buffer to prevent flickering from accidental mouse twitches.
@@ -59,10 +59,11 @@ To test and run Idlescape manually from source:
 3. Configure your preferences: 
    - **Video Path:** Point this to the absolute path of your desired screensaver video (e.g., `/home/user/Videos/relax.mp4`).
    - **Idle Timeout:** Time in seconds before the video triggers.
+   - **Multi-monitor playback:** Enable playback on every connected monitor. Disabled by default.
 
 ## 📖 Backend Modes
 Idlescape ships with two modes controllable via the Settings GUI:
-* **Native (Recommended):** Spawns `mpv` natively via `Gio.Subprocess`, leveraging strict Wayland routines (`--vo=dmabuf-wayland`, `--fs-screen=0`) with auto-fallback to `gpu-next`.
+* **Native (Recommended):** Spawns `mpv` natively via `Gio.Subprocess`. Multi-monitor playback is optional and disabled by default; when enabled, it starts one player per connected monitor.
 * **Bash (Stable Fallback):** Legacy mode that runs `~/.local/bin/screensaver.sh` if you prefer to manage the environment and `mpv` execution manually. **To use this mode, you must install the script from the source folder:**
   ```bash
   mkdir -p ~/.local/bin
